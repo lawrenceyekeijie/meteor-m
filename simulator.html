@@ -2,113 +2,44 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Asteroid Simulator 🛰️</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meteor Madness - Simulator</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script defer src="script.js"></script>
 </head>
 <body>
-  <header>Meteor Madness 🚀</header>
   <nav>
-    <a href="index.html">Home</a>
-    <a href="simulator.html">Simulator</a>
-    <a href="quiz.html">Quiz</a>
-    <a href="history.html">History</a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="simulator.html">Simulator</a></li>
+      <li><a href="quiz.html">Quiz</a></li>
+      <li><a href="history.html">History</a></li>
+      <li><a href="about.html">About</a></li>
+    </ul>
   </nav>
 
-  <section>
-    <h2>🌌 Choose a Real Asteroid (NASA NEO API)</h2>
-    <select id="asteroidList" onchange="loadAsteroidData(this.value)">
-      <option value="">-- Loading from NASA API... --</option>
-    </select>
-    <div id="asteroidInfo"></div>
+  <section class="content">
+    <div class="speech-bubble">Change asteroid speed and size to see what happens!</div>
+    <canvas id="simCanvas" width="400" height="300"></canvas>
   </section>
 
-  <section>
-    <h2>🛰️ Custom Impact Simulation</h2>
-    <label>Size (m): <input id="size" type="number" value="100"></label>
-    <label>Speed (km/s): <input id="speed" type="number" value="20"></label>
-    <button onclick="simulateImpact()">Simulate</button>
-    <div id="output"></div>
-  </section>
-
-  <section>
-    <h2>🗺️ Pick Impact Location</h2>
-    <p>Click anywhere on the map to set the asteroid impact point.</p>
-    <div id="map"></div>
-  </section>
-
-  <section>
-    <h2>🛡️ Mini Game: Defend Earth</h2>
-    <button onclick="startDefense()">Start Defense Challenge</button>
-    <div id="game"></div>
-  </section>
-
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // ========== NASA API ==========
-    const apiKey = "DEMO_KEY"; // 👉 建议去 https://api.nasa.gov/ 换成你自己的 key
-    const asteroidList = document.getElementById("asteroidList");
-    const asteroidInfo = document.getElementById("asteroidInfo");
+    // Simple asteroid simulation
+    const canvas = document.getElementById("simCanvas");
+    const ctx = canvas.getContext("2d");
+    let x = 50, y = 50, dx = 3, dy = 2;
 
-    fetch(`https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=${apiKey}`)
-      .then(res => res.json())
-      .then(data => {
-        asteroidList.innerHTML = '<option value="">-- Select an asteroid --</option>';
-        data.near_earth_objects.slice(0,10).forEach(asteroid => {
-          let option = document.createElement("option");
-          option.value = JSON.stringify({
-            name: asteroid.name,
-            size: asteroid.estimated_diameter.meters.estimated_diameter_max.toFixed(0),
-            speed: (asteroid.close_approach_data[0]?.relative_velocity.kilometers_per_second || 20).toFixed(1)
-          });
-          option.textContent = asteroid.name;
-          asteroidList.appendChild(option);
-        });
-      });
-
-    function loadAsteroidData(val) {
-      if (!val) return;
-      let a = JSON.parse(val);
-      document.getElementById("size").value = a.size;
-      document.getElementById("speed").value = a.speed;
-      asteroidInfo.innerHTML = `🌑 <b>${a.name}</b><br>Size: ${a.size} m<br>Speed: ${a.speed} km/s`;
+    function drawAsteroid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = "gray";
+      ctx.fill();
+      x += dx; y += dy;
+      if (x > canvas.width || x < 0) dx *= -1;
+      if (y > canvas.height || y < 0) dy *= -1;
     }
-
-    // ========== Map ==========
-    var map = L.map('map').setView([20,0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    var marker;
-    var impactCoords = [0,0];
-
-    map.on('click', function(e) {
-      if (marker) map.removeLayer(marker);
-      marker = L.marker(e.latlng).addTo(map).bindPopup("Impact Point").openPopup();
-      impactCoords = [e.latlng.lat, e.latlng.lng];
-    });
-
-    // ========== Simulation ==========
-    function simulateImpact() {
-      let size = document.getElementById("size").value;
-      let speed = document.getElementById("speed").value;
-      // 粗略能量计算 (TNT 当量)
-      let energy = (0.5 * (4/3*Math.PI*(size/2)**3 * 3000) * (speed*1000)**2) / 4.184e15;
-      document.getElementById("output").innerHTML =
-        `💥 Estimated Impact Energy: ${energy.toExponential(2)} tons TNT` +
-        `<br>🌍 Location: ${impactCoords[0].toFixed(2)}, ${impactCoords[1].toFixed(2)}` +
-        `<br>⚠️ Possible Effects: Crater ~ ${(size/2).toFixed(0)} m, Global shockwave risk.`;
-    }
-
-    // ========== Mini Game ==========
-    function startDefense() {
-      const defenses = ["🚀 Kinetic Impact", "🔦 Laser Beam", "🛰️ Gravity Tractor"];
-      let choice = defenses[Math.floor(Math.random()*defenses.length)];
-      let success = Math.random() > 0.5 ? "✅ Earth Saved!" : "💀 Mission Failed!";
-      document.getElementById("game").innerHTML =
-        `You chose: <b>${choice}</b><br>Result: ${success}`;
-    }
+    setInterval(drawAsteroid, 30);
   </script>
 </body>
 </html>
-
