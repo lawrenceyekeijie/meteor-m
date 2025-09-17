@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Meteor Madness</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { margin:0; font-family: Arial; background:#0b0c10; color:white; text-align:center; }
+    header { background:#1f2833; padding:15px; font-size:24px; font-weight:bold; }
+    section { margin:20px auto; max-width:800px; background:#1f2833; padding:20px; border-radius:8px; }
+    button { margin:10px; padding:10px 20px; font-size:16px; cursor:pointer; background:#45a29e; border:none; border-radius:5px; color:white; }
+    #map { height:400px; margin-top:15px; }
+    #output { color:#66fcf1; font-size:18px; margin-top:15px; }
+  </style>
+</head>
+<body>
+
+<header>🌍 Meteor Madness Simulator</header>
+
+<section>
+  <h2>🚀 Meteor Impact Calculator</h2>
+  <label>Size (m): <input id="size" type="number" value="100"></label>
+  <label>Speed (km/s): <input id="speed" type="number" value="20"></label>
+  <button onclick="simulateImpact()">Simulate</button>
+  <div id="output"></div>
+</section>
+
+<section>
+  <h2>🗺️ Choose Impact Location</h2>
+  <div id="map"></div>
+</section>
+
+<section>
+  <h2>🛡️ Defend Earth (Mini-game)</h2>
+  <button onclick="startDefense()">Start Defense Challenge</button>
+  <div id="game"></div>
+</section>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  // 🌍 Leaflet 地图
+  var map = L.map('map').setView([20,0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  var marker;
+  map.on('click', function(e) {
+    if (marker) map.removeLayer(marker);
+    marker = L.marker(e.latlng).addTo(map).bindPopup("Impact Point").openPopup();
+    document.getElementById("output").innerHTML = "🌋 Meteor will hit at " + e.latlng.toString();
+  });
+
+  // 💥 撞击模拟
+  function simulateImpact() {
+    let size = parseFloat(document.getElementById("size").value);
+    let speed = parseFloat(document.getElementById("speed").value);
+
+    let radius = size/2;
+    let volume = (4/3) * Math.PI * Math.pow(radius,3);
+    let mass = volume * 3000; // density 3000kg/m^3
+    let velocity = speed * 1000;
+    let energy = 0.5 * mass * velocity * velocity;
+    let tnt = energy / 4.184e9;
+
+    document.getElementById("output").innerHTML =
+      `💥 Energy: ${tnt.toExponential(2)} tons TNT<br>
+       🌍 Crater: ~${(size*12).toFixed(0)} m<br>
+       ⚠️ ${(tnt>1e9)?"Mass extinction risk":"Localized damage"}`;
+  }
+
+  // 🎮 防御小游戏
+  function startDefense() {
+    let countdown = 10;
+    let gameDiv = document.getElementById("game");
+    gameDiv.innerHTML = `☄️ Meteor incoming in <b>${countdown}</b> seconds...`;
+    let timer = setInterval(()=>{
+      countdown--;
+      if(countdown<=0) {
+        clearInterval(timer);
+        gameDiv.innerHTML = `
+          🌍 Choose your defense:<br>
+          <button onclick="defenseResult('kinetic')">Kinetic Impactor</button>
+          <button onclick="defenseResult('nuke')">Nuclear Explosion</button>
+          <button onclick="defenseResult('tractor')">Gravity Tractor</button>`;
+      } else {
+        gameDiv.innerHTML = `☄️ Meteor incoming in <b>${countdown}</b> seconds...`;
+      }
+    },1000);
+  }
+
+  function defenseResult(choice) {
+    let msg;
+    if(choice==='kinetic') msg = "🚀 Kinetic impactor hit! Meteor deflected successfully ✅";
+    if(choice==='nuke') msg = "💥 Nuclear blast shattered the meteor, fragments still hit Earth ⚠️";
+    if(choice==='tractor') msg = "🛰️ Gravity tractor slowly changed orbit — Earth saved but just in time! ✅";
+    document.getElementById("game").innerHTML = msg;
+  }
+</script>
+
+</body>
+</html>
