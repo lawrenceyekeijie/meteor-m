@@ -1,102 +1,499 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Meteor Madness</title>
+  <meta charset="utf-8" />
+  <title>Meteor Madness — Full Demo</title>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
   <style>
-    body { margin:0; font-family: Arial; background:#0b0c10; color:white; text-align:center; }
-    header { background:#1f2833; padding:15px; font-size:24px; font-weight:bold; }
-    section { margin:20px auto; max-width:800px; background:#1f2833; padding:20px; border-radius:8px; }
-    button { margin:10px; padding:10px 20px; font-size:16px; cursor:pointer; background:#45a29e; border:none; border-radius:5px; color:white; }
-    #map { height:400px; margin-top:15px; }
-    #output { color:#66fcf1; font-size:18px; margin-top:15px; }
+    :root{
+      --bg:#071017; --card:#0f1b22; --accent:#46c6b3; --muted:#9fb6bd; --glass: rgba(255,255,255,0.04);
+    }
+    html,body{height:100%; margin:0; font-family:Inter, Arial, sans-serif; background:linear-gradient(180deg,#04121a,#071017); color:#e6f7f6;}
+    header{padding:18px 24px; font-size:22px; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:14px;}
+    main{display:flex; gap:18px; padding:18px; box-sizing:border-box;}
+    .column{flex:1; min-width:300px;}
+    .card{background:var(--card); border-radius:12px; padding:14px; box-shadow:0 6px 18px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.03);}
+    .controls {display:flex; flex-direction:column; gap:10px;}
+    label{font-size:13px; color:var(--muted);}
+    input[type="number"], select {width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:inherit;}
+    button{background:var(--accent); color:#021517; padding:10px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:700;}
+    #map{height:330px; border-radius:8px; overflow:hidden;}
+    #threejsCanvas{width:100%; height:380px; display:block; border-radius:8px; background:linear-gradient(180deg,#081827,#08121a);}
+    #output{color:#9ff3ea; line-height:1.45; margin-top:8px;}
+    .small{font-size:12px; color:var(--muted);}
+    .row{display:flex; gap:8px; align-items:center;}
+    footer{padding:10px 18px; font-size:12px; color:var(--muted); text-align:center;}
+    .badge{background:rgba(255,255,255,0.03); padding:6px 8px; border-radius:8px; font-size:12px;}
+    .tooltip {font-size:12px; color:var(--muted);}
   </style>
 </head>
 <body>
+  <header class="card" style="margin:12px;">
+    <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#3fe0c0,#2aa19a);display:flex;align-items:center;justify-content:center;font-weight:800;color:#021517">MM</div>
+    Meteor Madness — Asteroid Impact Simulator (Full Demo)
+  </header>
 
-<header>🌍 Meteor Madness Simulator</header>
+  <main>
+    <!-- LEFT: 3D + Map -->
+    <div class="column">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div><strong>3D View</strong><div class="small">Watch asteroid fly toward Earth</div></div>
+          <div class="badge small">Demo — replace API key for more NEOs</div>
+        </div>
+        <canvas id="threejsCanvas"></canvas>
+      </div>
 
-<section>
-  <h2>🚀 Meteor Impact Calculator</h2>
-  <label>Size (m): <input id="size" type="number" value="100"></label>
-  <label>Speed (km/s): <input id="speed" type="number" value="20"></label>
-  <button onclick="simulateImpact()">Simulate</button>
-  <div id="output"></div>
-</section>
+      <div class="card" style="margin-top:12px;">
+        <strong>Impact Map</strong><div class="small">Click map to place impact point</div>
+        <div id="map"></div>
+      </div>
+    </div>
 
-<section>
-  <h2>🗺️ Choose Impact Location</h2>
-  <div id="map"></div>
-</section>
+    <!-- RIGHT: Controls -->
+    <div class="column">
+      <div class="card controls">
+        <div>
+          <strong>Load real asteroids (NASA NEO)</strong>
+          <div class="small">Select a real near-earth object to auto-fill parameters</div>
+        </div>
+        <select id="asteroidList"><option>Loading NEOs...</option></select>
+        <div id="asteroidMeta" class="small"></div>
+      </div>
 
-<section>
-  <h2>🛡️ Defend Earth (Mini-game)</h2>
-  <button onclick="startDefense()">Start Defense Challenge</button>
-  <div id="game"></div>
-</section>
+      <div class="card controls" style="margin-top:12px;">
+        <div><strong>Custom impact parameters</strong></div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script>
-  // 🌍 Leaflet 地图
-  var map = L.map('map').setView([20,0], 2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+        <label>Diameter (m)</label>
+        <input id="size" type="number" min="1" value="100" />
 
-  var marker;
-  map.on('click', function(e) {
-    if (marker) map.removeLayer(marker);
-    marker = L.marker(e.latlng).addTo(map).bindPopup("Impact Point").openPopup();
-    document.getElementById("output").innerHTML = "🌋 Meteor will hit at " + e.latlng.toString();
+        <label>Speed (km/s)</label>
+        <input id="speed" type="number" min="0.1" step="0.1" value="20" />
+
+        <label>Density (kg/m³) <span class="small tooltip">(default rock ≈3000)</span></label>
+        <input id="density" type="number" value="3000" />
+
+        <div class="row" style="margin-top:6px;">
+          <button id="btnSim">Simulate Impact</button>
+          <button id="btnCenter">Center 3D</button>
+          <button id="btnShare">Copy Result Link</button>
+        </div>
+
+        <div id="output"></div>
+      </div>
+
+      <div class="card controls" style="margin-top:12px;">
+        <div><strong>Mini-game: Defend Earth</strong></div>
+        <div class="small">You have <span id="countdownStart">10</span> seconds before impact in challenge mode.</div>
+        <div class="row">
+          <button id="btnStartChallenge">Start Challenge</button>
+          <button id="btnReset">Reset</button>
+        </div>
+        <div id="game"></div>
+      </div>
+
+      <div class="card controls" style="margin-top:12px;">
+        <div><strong>Explanations & Tips</strong></div>
+        <div class="small">
+          • Impact energy = 0.5 * m * v² (J). <br>
+          • TNT: 1 ton TNT = 4.184×10⁹ J. <br>
+          • Crater is approximated here as ~10× object diameter (illustrative). <br>
+          • Use your GitHub Pages URL to demo this live.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>Built for demo — replace <code>DEMO_KEY</code> with your NASA API key. Host on GitHub Pages for judges.</footer>
+
+  <!-- SCRIPTS: Leaflet & Three.js -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/three@0.153.0/build/three.min.js"></script>
+
+  <script>
+  /**********************
+   * Configuration
+   **********************/
+  const apiKey = "DEMO_KEY"; // <<<--- REPLACE with your NASA API KEY
+  const asteroidSelect = document.getElementById('asteroidList');
+  const asteroidMeta = document.getElementById('asteroidMeta');
+  const sizeInput = document.getElementById('size');
+  const speedInput = document.getElementById('speed');
+  const densityInput = document.getElementById('density');
+  const output = document.getElementById('output');
+  const gameDiv = document.getElementById('game');
+
+  // store chosen impact coordinates (default near equator)
+  let impactCoords = {lat: 0, lng: 0};
+
+  /**********************
+   * NASA NEO: fetch a page of neos
+   **********************/
+  fetch(`https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=${apiKey}`)
+    .then(r => r.json())
+    .then(data => {
+      asteroidSelect.innerHTML = '<option value="">-- Choose a NASA NEO (examples) --</option>';
+      // use first page, take up to 20
+      data.near_earth_objects.slice(0,20).forEach(n => {
+        const maxDiam = Math.round(n.estimated_diameter.meters.estimated_diameter_max || 50);
+        const speed = (n.close_approach_data[0]?.relative_velocity?.kilometers_per_second) || 20;
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({name:n.name, diam:maxDiam, speed:parseFloat(speed).toFixed(2)});
+        opt.text = `${n.name} — ≈${maxDiam} m`;
+        asteroidSelect.appendChild(opt);
+      });
+    })
+    .catch(err => {
+      asteroidSelect.innerHTML = '<option>Failed to load NEOs (rate-limited). Use custom inputs.</option>';
+      console.warn("NASA API error:", err);
+    });
+
+  asteroidSelect.addEventListener('change', ()=> {
+    if(!asteroidSelect.value) { asteroidMeta.innerHTML = ''; return; }
+    const a = JSON.parse(asteroidSelect.value);
+    sizeInput.value = a.diam;
+    speedInput.value = a.speed;
+    asteroidMeta.innerHTML = `<div class="small">Selected: <b>${a.name}</b> — Diameter ≈ ${a.diam} m, Speed ≈ ${a.speed} km/s</div>`;
+    // update 3D asteroid size & speed
+    setAsteroidParams(parseFloat(a.diam), parseFloat(a.speed));
   });
 
-  // 💥 撞击模拟
-  function simulateImpact() {
-    let size = parseFloat(document.getElementById("size").value);
-    let speed = parseFloat(document.getElementById("speed").value);
+  /**********************
+   * Leaflet Map
+   **********************/
+  const map = L.map('map').setView([10, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap contributors'
+  }).addTo(map);
+  let mapMarker;
+  map.on('click', e => {
+    impactCoords = {lat: e.latlng.lat, lng: e.latlng.lng};
+    if(mapMarker) map.removeLayer(mapMarker);
+    mapMarker = L.marker(e.latlng).addTo(map).bindPopup('Impact point').openPopup();
+    output.innerHTML = `<div class="small">Impact set to ${impactCoords.lat.toFixed(3)}, ${impactCoords.lng.toFixed(3)}</div>` + output.innerHTML;
+  });
 
-    let radius = size/2;
-    let volume = (4/3) * Math.PI * Math.pow(radius,3);
-    let mass = volume * 3000; // density 3000kg/m^3
-    let velocity = speed * 1000;
-    let energy = 0.5 * mass * velocity * velocity;
-    let tnt = energy / 4.184e9;
-
-    document.getElementById("output").innerHTML =
-      `💥 Energy: ${tnt.toExponential(2)} tons TNT<br>
-       🌍 Crater: ~${(size*12).toFixed(0)} m<br>
-       ⚠️ ${(tnt>1e9)?"Mass extinction risk":"Localized damage"}`;
+  /**********************
+   * Simple physics & display
+   **********************/
+  function computeImpact(d_m, v_km_s, density_kgm3){
+    // Step-by-step numeric to avoid mistakes:
+    // radius (m)
+    const r = d_m / 2.0;
+    // volume of sphere: 4/3 π r^3
+    const volume = (4.0/3.0) * Math.PI * Math.pow(r, 3);
+    // mass = volume * density
+    const mass = volume * density_kgm3;
+    // velocity (m/s)
+    const v = v_km_s * 1000.0;
+    // kinetic energy J = 0.5 m v^2
+    const energyJ = 0.5 * mass * v * v;
+    // TNT equivalent (tons) (1 ton TNT = 4.184e9 J)
+    const tntTons = energyJ / 4.184e9;
+    // also convert to megatons
+    const tntMega = tntTons / 1e6;
+    // rough crater diameter estimate: approx 10× object diameter (illustrative)
+    const crater_m = d_m * 10;
+    return {mass, energyJ, tntTons, tntMega, crater_m};
   }
 
-  // 🎮 防御小游戏
-  function startDefense() {
-    let countdown = 10;
-    let gameDiv = document.getElementById("game");
-    gameDiv.innerHTML = `☄️ Meteor incoming in <b>${countdown}</b> seconds...`;
-    let timer = setInterval(()=>{
-      countdown--;
-      if(countdown<=0) {
-        clearInterval(timer);
-        gameDiv.innerHTML = `
-          🌍 Choose your defense:<br>
-          <button onclick="defenseResult('kinetic')">Kinetic Impactor</button>
-          <button onclick="defenseResult('nuke')">Nuclear Explosion</button>
-          <button onclick="defenseResult('tractor')">Gravity Tractor</button>`;
-      } else {
-        gameDiv.innerHTML = `☄️ Meteor incoming in <b>${countdown}</b> seconds...`;
+  document.getElementById('btnSim').addEventListener('click', ()=> {
+    runSimulation(false);
+  });
+
+  function runSimulation(isChallengeResult){
+    const d = parseFloat(sizeInput.value) || 100;
+    const v = parseFloat(speedInput.value) || 20;
+    const density = parseFloat(densityInput.value) || 3000;
+    const res = computeImpact(d, v, density);
+
+    // Format results
+    const energyStr = res.energyJ.toExponential(3) + ' J';
+    const tonsStr = res.tntTons.toExponential(3) + ' tons TNT';
+    const megaStr = res.tntMega.toExponential(3) + ' Mt TNT';
+    const craterStr = Math.round(res.crater_m) + ' m';
+
+    // Location info
+    const loc = `Lat ${impactCoords.lat.toFixed(3)}, Lng ${impactCoords.lng.toFixed(3)}`;
+
+    // rough "severity" message
+    let severity = 'Localized damage';
+    if(res.tntMega > 1e3) severity = 'Global catastrophic (mass extinction possible)';
+    else if(res.tntMega > 1) severity = 'Regional catastrophic';
+    else if(res.tntMega > 0.01) severity = 'Serious local to regional damage';
+
+    output.innerHTML = `
+      <div><b>Impact Summary</b></div>
+      <div class="small">Diameter: ${d} m &nbsp;|&nbsp; Speed: ${v} km/s &nbsp;|&nbsp; Density: ${density} kg/m³</div>
+      <div style="margin-top:8px;">
+        ⚡ Energy: <b>${energyStr}</b><br>
+        🧨 TNT equiv: <b>${tonsStr}</b> (~ <b>${megaStr}</b>)<br>
+        🕳️ Crater (approx): <b>${craterStr}</b><br>
+        📍 Impact loc: <b>${loc}</b><br>
+        ⚠️ Estimated severity: <b>${severity}</b>
+      </div>
+    `;
+
+    // Animate 3D asteroid impact (or near-miss)
+    if(!isChallengeResult) triggerAsteroidFlyby(false);
+  }
+
+  // share link: encode parameters into URL hash
+  document.getElementById('btnShare').addEventListener('click', ()=>{
+    const params = {
+      d: sizeInput.value,
+      v: speedInput.value,
+      den: densityInput.value,
+      lat: impactCoords.lat,
+      lng: impactCoords.lng
+    };
+    const hash = btoa(JSON.stringify(params));
+    const url = `${location.origin}${location.pathname}#${hash}`;
+    navigator.clipboard.writeText(url).then(()=> alert('Result link copied to clipboard!'));
+  });
+
+  // load from link if present
+  function loadFromHash(){
+    if(location.hash && location.hash.length>1){
+      try {
+        const parsed = JSON.parse(atob(location.hash.slice(1)));
+        sizeInput.value = parsed.d || sizeInput.value;
+        speedInput.value = parsed.v || speedInput.value;
+        densityInput.value = parsed.den || densityInput.value;
+        impactCoords.lat = parsed.lat || impactCoords.lat;
+        impactCoords.lng = parsed.lng || impactCoords.lng;
+        if(mapMarker) map.removeLayer(mapMarker);
+        mapMarker = L.marker([impactCoords.lat, impactCoords.lng]).addTo(map).bindPopup('Impact (from link)').openPopup();
+      } catch(e){ console.warn('Bad hash:', e); }
+    }
+  }
+  loadFromHash();
+
+  /**********************
+   * Three.js: Earth + asteroid + animation
+   **********************/
+  let scene, camera, renderer, earthMesh, asteroidMesh, asteroidParams = {diam:100, speed:20}, asteroidState = {flying:false, miss:false};
+
+  function initThree(){
+    const canvas = document.getElementById('threejsCanvas');
+    renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x04161b);
+
+    camera = new THREE.PerspectiveCamera(35, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    camera.position.set(0, 10, 60);
+
+    // lights
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x080820, 0.7); scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7); scene.add(dir);
+
+    // Earth (simple sphere)
+    const earthGeo = new THREE.SphereGeometry(12, 64, 64);
+    const earthMat = new THREE.MeshStandardMaterial({color:0x15607a, metalness:0.1, roughness:0.8});
+    earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    earthMesh.rotation.y = 0.5;
+    scene.add(earthMesh);
+
+    // asteroid (small sphere)
+    const astGeo = new THREE.SphereGeometry(1.2, 24, 24);
+    const astMat = new THREE.MeshStandardMaterial({color:0x8b5a2b, metalness:0.2, roughness:0.7});
+    asteroidMesh = new THREE.Mesh(astGeo, astMat);
+    resetAsteroidPosition();
+    scene.add(asteroidMesh);
+
+    // ground grid (for orientation)
+    const grid = new THREE.GridHelper(200, 40, 0x113033, 0x0b2a2f); grid.rotation.x = Math.PI/2; grid.position.y = -20; scene.add(grid);
+
+    window.addEventListener('resize', onResize);
+    animate();
+  }
+
+  function onResize(){
+    const canvas = renderer.domElement;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    renderer.setSize(w,h,false);
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+
+  function resetAsteroidPosition(){
+    asteroidMesh.position.set(0, 0, -220); // far away on z-
+    asteroidMesh.scale.set(1,1,1);
+    asteroidState=flyingState(false,false);
+  }
+
+  function setAsteroidParams(diam, speed){
+    asteroidParams.diam = diam;
+    asteroidParams.speed = speed;
+    // scale asteroid visual roughly
+    const scale = Math.max(0.5, diam / 50.0);
+    asteroidMesh.scale.set(scale, scale, scale);
+  }
+
+  function flyingState(isFlying, isMiss){ return {flying:isFlying, miss:isMiss, progress:0}; }
+
+  function triggerAsteroidFlyby(isMiss){
+    // start animation: asteroid approaches Earth (z from -220 -> -12)
+    asteroidState = flyingState(true, !!isMiss);
+    asteroidMesh.position.set((impactCoords.lng/180)*30, (impactCoords.lat/90)*18, -220);
+    // tweak direction slightly if miss
+    if(isMiss){
+      asteroidState.miss = true;
+    }
+  }
+
+  // public call when simulation runs
+  function triggerAsteroidImpactVisual(missed=false){
+    triggerAsteroidFlyby(missed);
+  }
+
+  // animate loop
+  function animate(){
+    requestAnimationFrame(animate);
+    // Earth rotate
+    earthMesh.rotation.y += 0.0014;
+
+    // asteroid flying
+    if(asteroidState.flying){
+      asteroidState.progress += 0.003 * (asteroidParams.speed/10);
+      // linear interpolation z
+      asteroidMesh.position.z = THREE.MathUtils.lerp(-220, -12, asteroidState.progress);
+      // if miss: shift x over time
+      if(asteroidState.miss){
+        asteroidMesh.position.x += 0.05 * (asteroidState.progress*20);
+      }
+      // if reached near earth
+      if(asteroidState.progress >= 1.0){
+        asteroidState.flying = false;
+        // create simple flash or bounce to show impact
+        const flash = new THREE.PointLight(0xffaa33, 3, 120);
+        flash.position.copy(asteroidMesh.position);
+        scene.add(flash);
+        setTimeout(()=> scene.remove(flash), 800);
+        // if not miss, tiny shake camera
+        if(!asteroidState.miss) camera.position.z += 1.5;
+        setTimeout(()=> camera.position.z = 60, 600);
+        // reset asteroid after moment
+        setTimeout(()=> resetAsteroidPosition(), 1500);
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // init three
+  initThree();
+
+  // btn center camera
+  document.getElementById('btnCenter').addEventListener('click', ()=> {
+    camera.position.set(0,12,60);
+  });
+
+  /**********************
+   * Challenge (game) mode
+   **********************/
+  let challengeTimer = null, timeLeft = 10;
+  document.getElementById('btnStartChallenge').addEventListener('click', ()=> {
+    startChallenge();
+  });
+  document.getElementById('btnReset').addEventListener('click', ()=> {
+    resetDemo();
+  });
+
+  function startChallenge(){
+    // set a fresh impact location near center
+    impactCoords = {lat: (Math.random()*120)-60, lng: (Math.random()*360)-180};
+    if(mapMarker) map.removeLayer(mapMarker);
+    mapMarker = L.marker([impactCoords.lat, impactCoords.lng]).addTo(map).bindPopup('Challenge impact point').openPopup();
+    timeLeft = 10;
+    gameDiv.innerHTML = `<div>Incoming asteroid! Time to choose defense: <b id="timeLeft">${timeLeft}</b>s</div>
+      <div style="margin-top:8px;">
+        <button onclick="chooseDefense('kinetic')">Kinetic Impactor</button>
+        <button onclick="chooseDefense('nuke')">Nuclear Burst</button>
+        <button onclick="chooseDefense('tractor')">Gravity Tractor</button>
+      </div>`;
+    challengeTimer = setInterval(()=> {
+      timeLeft--;
+      document.getElementById('timeLeft').textContent = timeLeft;
+      if(timeLeft<=0){
+        clearInterval(challengeTimer);
+        // no choice => failed
+        performChallengeResult(null);
       }
     },1000);
   }
 
-  function defenseResult(choice) {
-    let msg;
-    if(choice==='kinetic') msg = "🚀 Kinetic impactor hit! Meteor deflected successfully ✅";
-    if(choice==='nuke') msg = "💥 Nuclear blast shattered the meteor, fragments still hit Earth ⚠️";
-    if(choice==='tractor') msg = "🛰️ Gravity tractor slowly changed orbit — Earth saved but just in time! ✅";
-    document.getElementById("game").innerHTML = msg;
+  function chooseDefense(type){
+    if(challengeTimer) clearInterval(challengeTimer);
+    performChallengeResult(type);
   }
-</script>
 
+  function performChallengeResult(type){
+    // simple probabilistic outcomes (for demo)
+    // kinetic: 60% success, nuke: 70% success but fragment risk, tractor: 40% success but safe long-term
+    let r = Math.random();
+    let success=false, message='';
+    if(!type){ success=false; message='No defense chosen — impact occurred.'; triggerAsteroidImpactVisual(false); }
+    else if(type==='kinetic'){ success = (r < 0.60); message = success ? 'Kinetic hit! Path changed.' : 'Kinetic missed or insufficient energy.'; triggerAsteroidImpactVisual(!success ? false : true); }
+    else if(type==='nuke'){ success = (r < 0.70); message = success ? 'Nuclear deflection worked (high risk: fragments).' : 'Nuclear failed to deflect enough fragments.'; triggerAsteroidImpactVisual(!success ? false : true); }
+    else if(type==='tractor'){ success = (r < 0.40); message = success ? 'Gravity tractor slowly changed orbit — success.' : 'Too slow — impact still occurs.'; triggerAsteroidImpactVisual(!success ? false : true); }
+
+    // show result + estimated damage modification
+    let d = parseFloat(sizeInput.value) || 100;
+    let v = parseFloat(speedInput.value) || 20;
+    let density = parseFloat(densityInput.value) || 3000;
+    let res = computeImpact(d, v, density);
+    let mod = success ? 0.02 : 1.0; // if success, reduce energy drastically for demo
+    const finalMega = res.tntMega * mod;
+
+    gameDiv.innerHTML = `<div><b>Defense result:</b> ${message}</div>
+      <div class="small" style="margin-top:6px;">Estimated post-defense energy: <b>${finalMega.toExponential(3)} Mt TNT</b></div>
+      <div style="margin-top:6px;"><button onclick="startChallenge()">Play Again</button></div>`;
+  }
+
+  function resetDemo(){
+    if(challengeTimer) clearInterval(challengeTimer);
+    gameDiv.innerHTML = '';
+    resetAsteroidPosition();
+    if(mapMarker) { map.removeLayer(mapMarker); mapMarker=null; }
+    impactCoords = {lat:0,lng:0};
+    output.innerHTML = '';
+  }
+
+  /**********************
+   * small helpers: wire ambient params
+   **********************/
+  function triggerAsteroidFlybyPublic(missFlag=false){
+    triggerAsteroidImpactVisual(missFlag);
+  }
+
+  // allow external call: when user presses simulate, animate asteroid as impacting
+  function triggerAsteroidFlybyWrapper(){
+    // use severity to decide miss or hit randomly based on energy
+    const d = parseFloat(sizeInput.value) || 100;
+    const v = parseFloat(speedInput.value) || 20;
+    const density = parseFloat(densityInput.value) || 3000;
+    const res = computeImpact(d,v,density);
+    // if huge energy, always hit visually
+    const missProb = Math.min(0.6, 1 - Math.log10(Math.max(1, res.tntTons))/10);
+    const miss = Math.random() < missProb;
+    triggerAsteroidImpactVisual(miss);
+  }
+
+  // connect simulate to 3D visual
+  document.getElementById('btnSim').addEventListener('click', ()=>{
+    triggerAsteroidFlybyWrapper();
+  });
+
+  // ensure Three canvas sizes correctly on load
+  setTimeout(()=>{ onResize(); }, 300);
+
+  </script>
 </body>
 </html>
